@@ -68,7 +68,6 @@ defmodule Sudoku do
   def assign_into(values, initial_grid) do
     Enum.reduce(values, {:ok, initial_grid}, &do_assign_into/2)
   end
-
   defp do_assign_into({s, [d]}, {:ok, grid}) when d in @digits do
     assign(grid, s, d)
   end
@@ -81,13 +80,11 @@ defmodule Sudoku do
     eliminate_values(grid, s, other_values)
   end
 
-
   defp eliminate_values(grid, s, values) do
     values
     |> Enum.reduce({{:ok, grid}, s}, &eliminate_value/2)
     |> elem(0)
   end
-
   defp eliminate_value(d, {{:ok, grid}, s}), do: {eliminate(grid, s, d), s}
   defp eliminate_value(_, {{:error, _}, _} = err), do: err
 
@@ -97,10 +94,8 @@ defmodule Sudoku do
     |> Enum.reduce({{:ok, grid}, d}, &eliminate_from_square/2)
     |> elem(0)
   end
-
   defp eliminate_from_square(s, {{:ok, grid}, d}), do: {eliminate(grid, s, d), d}
   defp eliminate_from_square(_, {{:error, _}, _} = err), do: err
-
 
   # Eliminate d from grid[s].
   defp eliminate(grid, s, d) do
@@ -118,10 +113,8 @@ defmodule Sudoku do
     end
   end
 
-
   # (1) If a square s is reduced to one value d2,
   #     then eliminate d2 from the peers.
-
   defp check_peers(grid, s, [d2]) do
     eliminate_from_squares(grid, @peers[s], d2)
   end
@@ -132,10 +125,8 @@ defmodule Sudoku do
     {:ok, grid}
   end
 
-
   # (2) If a unit u is reduced to only one place
   #     for a value d, then put it there.
-
   defp check_units(grid, s, d) do
     @units[s]
     |> Enum.reduce({{:ok, grid}, s, d}, &check_unit/2)
@@ -195,14 +186,14 @@ defmodule Sudoku do
       |> Enum.join("+")
 
     for r <- @rows do
-      for c <- @cols do
+      row = for c <- @cols do
         grid[[r, c]]
         |> center(width)
         |> Kernel.++(if c in '36', do: '|', else: '')
       end
-      |> IO.puts
 
-      if r in 'CF', do: IO.puts line
+      IO.puts(row)
+      if r in 'CF', do: IO.puts(line)
     end
 
     :ok
@@ -227,25 +218,60 @@ defmodule Sudoku do
     |> Enum.map(&to_charlist/1)
   end
 
-  def solve_all(specs, name \\ '') do
-    results = Enum.map(specs, & measure(fn -> solve(&1) end))
+  def solve_all(specs, name \\ '', show_if \\ 10.0) do
+    results = Enum.map(specs, & measure(fn -> {solve(&1), &1} end))
     times   = Enum.map(results, & elem(&1, 0))
-    solved  = results |> Enum.filter(& &1 |> elem(1) |> solved?) |> length
+    solved  = results |> Enum.filter(&solved?/1) |> length
 
     len = length(results)
     avg = Float.round(Enum.sum(times) / len, 2)
     max = times |> Enum.max |> Float.round(2)
 
+    for {t, s} <- results, t > show_if do
+      IO.puts "This puzzle took #{Float.round(t, 2)}s to solve:"
+      IO.puts elem(s, 1)
+    end
     IO.puts "Solved #{solved} of #{len} #{name} puzzles (avg #{avg}s, max #{max}s)"
   end
 
-  defp solved?({:error, _}), do: false
-  defp solved?({:ok, grid}) do
-    @units_list |> Enum.map(&unit_solved?(&1, grid)) |> Enum.all?
+  defp solved?({_, {{:error, _}, _}}), do: false
+  defp solved?({_, {{:ok, _}, _}}), do: true
+
+  # Make a random puzzle with 17 or more assignments. Restart on contradictions.
+  # Note the resulting puzzle is not guaranteed to be solvable, but empirically
+  # about 99.8% of them are solvable. Some have multiple solutions.
+
+  def random_puzzle do
+    @squares
+    |> Enum.shuffle
+    |> Enum.reduce({:ok, @initial_grid}, &create_random_grid/2)
+    |> restart_on_contradiction
   end
 
-  defp unit_solved?(unit, grid) do
-    (Enum.flat_map(unit, &grid[&1]) |> MapSet.new) == MapSet.new(@digits)
+  defp create_random_grid(s, {:ok, grid}) do
+    grid
+    |> assign(s, Enum.random(grid[s]))
+    |> enough_assignments?
+  end
+  defp create_random_grid(_, pass_through), do: pass_through
+
+  defp enough_assignments?({:error, _} = e), do: e
+  defp enough_assignments?({:ok, grid} = g) do
+    ds = for s <- @squares, length(grid[s]) == 1, do: grid[s]
+    if length(ds) >= 17 and (ds |> uniq |> length) >= 8 do
+      {:done, create_spec(grid)}
+    else
+      g
+    end
   end
 
+  defp create_spec(grid) do
+    for s <- @squares do
+      if length(grid[s]) == 1, do: grid[s], else: '.'
+    end
+    |> List.flatten
+  end
+
+  defp restart_on_contradiction({:done, spec}), do: spec
+  defp restart_on_contradiction(_), do: random_puzzle()
 end
