@@ -50,6 +50,7 @@ defmodule Sudoku do
   def parse_grid(spec) do
     spec
     |> Enum.filter(& &1 in [?., ?0 | @digits])
+    |> Enum.map(& [&1])
     |> grid_values
   end
 
@@ -57,36 +58,36 @@ defmodule Sudoku do
     raise "Invalid grid spec"
   end
   defp grid_values(spec) do
-    @squares |> Enum.zip(spec) |> Enum.into(%{})
+    @squares
+    |> Enum.zip(spec)
+    |> Enum.into(%{})
   end
 
   ################ Constraint Propagation ################
 
-  def assign_into(values, grid) do
-    Enum.reduce(values, {:ok, grid}, &do_assign_into/2)
+  def assign_into(values, initial_grid) do
+    Enum.reduce(values, {:ok, initial_grid}, &do_assign_into/2)
   end
 
-  defp do_assign_into({s, d}, {:ok, grid}) when d in @digits, do: assign(grid, s, d)
+  defp do_assign_into({s, [d]}, {:ok, grid}) when d in @digits, do: assign(grid, s, d)
   defp do_assign_into(_, {:ok, _} = grid), do: grid
   defp do_assign_into(_, {:error, _} = err), do: err
 
-  @doc """
-  Eliminate all the other values (except d) from grid[s].
-  """
-  def assign(grid, s, d) do
+  # Eliminate all the other values (except d) from grid[s].
+  defp assign(grid, s, d) do
     other_values = List.delete(grid[s], d)
     eliminate_values(grid, s, other_values)
   end
 
 
-  def eliminate_values(grid, s, values) do
+  defp eliminate_values(grid, s, values) do
     values
     |> Enum.reduce({{:ok, grid}, s}, &eliminate_value/2)
     |> elem(0)
   end
 
   defp eliminate_value(d, {{:ok, grid}, s}), do: {eliminate(grid, s, d), s}
-  defp eliminate_value(_, {{:error, _}, _} = msg), do: msg
+  defp eliminate_value(_, {{:error, _}, _} = err), do: err
 
 
   def eliminate_from_squares(grid, squares, d) do
@@ -99,18 +100,16 @@ defmodule Sudoku do
   defp eliminate_from_square(_, {{:error, _}, _} = msg), do: msg
 
 
-  @doc """
-  Eliminate d from grid[s].
-  """
-  def eliminate(grid, s, d) do
-    if not d in grid[s] do
-      {:ok, grid} # Already eliminated
+  # Eliminate d from grid[s].
+  defp eliminate(grid, s, d) do
+    if not d in grid[s] do # Already eliminated
+      {:ok, grid}
     else
-      new_grid = Map.update!(grid, s, & List.delete(&1, d))
+      grid = Map.update!(grid, s, & List.delete(&1, d))
 
-      with {:ok, grid1} <- check_peers(new_grid, s, new_grid[s]),
-           {:ok, grid2} <- check_units(grid1, s, d) do
-        {:ok, grid2}
+      with {:ok, grid} <- check_peers(grid, s, grid[s]),
+           {:ok, grid} <- check_units(grid, s, d) do
+        {:ok, grid}
       else
         err -> err
       end
@@ -118,22 +117,23 @@ defmodule Sudoku do
   end
 
 
-  @doc """
-   If a square s is reduced to one value d2, then eliminate d2 from the peers.
-  """
-  def check_peers(grid, s, [d2]) do
+  # (1) If a square s is reduced to one value d2,
+  #     then eliminate d2 from the peers.
+
+  defp check_peers(grid, s, [d2]) do
     eliminate_from_squares(grid, @peers[s], d2)
   end
-  def check_peers(_, _,  []) do
+  defp check_peers(_, _,  []) do
     {:error, :contradiction} # removed last value
   end
-  def check_peers(grid, _, _) do
+  defp check_peers(grid, _, _) do
     {:ok, grid}
   end
 
-  @doc """
-  If a unit u is reduced to only one place for a value d, then put it there.
-  """
+
+  # (2) If a unit u is reduced to only one place
+  #     for a value d, then put it there.
+
   defp check_units(grid, s, d) do
     @units[s]
     |> Enum.reduce({{:ok, grid}, s, d}, &check_unit/2)
@@ -144,23 +144,17 @@ defmodule Sudoku do
     dplaces = for s <- u, d in grid[s], do: s
 
     case length(dplaces) do
-       0 ->
-         # no place for this value
+       0 -> # no place for this value
          {{:error, :contradiction}, s, d}
-       1 ->
-         # d can only be in one place in unit; assign it there
+       1 -> # d can only be in one place in unit; assign it there
          {assign(grid, List.first(dplaces), d), s, d}
        _ -> msg
     end
   end
 
 
-  defp search({:ok, grid}) do
-    grid
-  end
-  defp search(_) do
-    {:error, "Failed earlier"}
-  end
+  defp search({:ok, grid}), do: grid
+  defp search(err), do: err
 
   # Sudoku.main '003020600900305001001806400008102900700000008006708200002609500800203009005010300'
 

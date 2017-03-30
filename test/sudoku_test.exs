@@ -31,7 +31,7 @@ defmodule SudokuTest do
     assert Enum.count(grid) == 81
 
     for {_k, v} <- grid do
-      assert v == ?.
+      assert v == '.'
     end
   end
 
@@ -40,9 +40,9 @@ defmodule SudokuTest do
     grid = Sudoku.parse_grid(spec)
 
     assert Enum.count(grid) == 81
-    assert grid['A1'] == ?1
-    assert grid['C1'] == ?.
-    assert grid['I9'] == ?9
+    assert grid['A1'] == '1'
+    assert grid['C1'] == '.'
+    assert grid['I9'] == '9'
   end
 
   test "parsing an invalid grid spec" do
