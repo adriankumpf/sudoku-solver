@@ -26,7 +26,7 @@ defmodule SudokuTest do
 
   test "parsing an empty grid spec" do
     empty_grid_spec = List.duplicate(?., 81)
-    grid = Sudoku.parse_grid(empty_grid_spec)
+    grid = Sudoku.parse_grid_spec(empty_grid_spec)
 
     assert Enum.count(grid) == 81
 
@@ -37,7 +37,7 @@ defmodule SudokuTest do
 
   test "parsing a valid grid spec" do
     spec = '1' ++ List.duplicate(?., 79) ++ '9'
-    grid = Sudoku.parse_grid(spec)
+    grid = Sudoku.parse_grid_spec(spec)
 
     assert Enum.count(grid) == 81
     assert grid['A1'] == '1'
@@ -48,7 +48,7 @@ defmodule SudokuTest do
   test "parsing an invalid grid spec" do
     spec = '!' ++ List.duplicate(?., 80)
     assert_raise RuntimeError, "Invalid grid spec", fn ->
-      Sudoku.parse_grid(spec)
+      Sudoku.parse_grid_spec(spec)
     end
   end
 

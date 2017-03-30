@@ -69,9 +69,11 @@ defmodule Sudoku do
     Enum.reduce(values, {:ok, initial_grid}, &do_assign_into/2)
   end
 
-  defp do_assign_into({s, [d]}, {:ok, grid}) when d in @digits, do: assign(grid, s, d)
+  defp do_assign_into({s, [d]}, {:ok, grid}) when d in @digits do
+    assign(grid, s, d)
+  end
   defp do_assign_into(_, {:ok, _} = grid), do: grid
-  defp do_assign_into(_, :error = err), do: err
+  defp do_assign_into(_, {:error, _} = err), do: err
 
   # Eliminate all the other values (except d) from grid[s].
   defp assign(grid, s, d) do
@@ -87,17 +89,17 @@ defmodule Sudoku do
   end
 
   defp eliminate_value(d, {{:ok, grid}, s}), do: {eliminate(grid, s, d), s}
-  defp eliminate_value(_, {:error, _} = err), do: err
+  defp eliminate_value(_, {{:error, _}, _} = err), do: err
 
 
-  def eliminate_from_squares(grid, squares, d) do
+  defp eliminate_from_squares(grid, squares, d) do
     squares
     |> Enum.reduce({{:ok, grid}, d}, &eliminate_from_square/2)
     |> elem(0)
   end
 
   defp eliminate_from_square(s, {{:ok, grid}, d}), do: {eliminate(grid, s, d), d}
-  defp eliminate_from_square(_, {:error, _} = err), do: err
+  defp eliminate_from_square(_, {{:error, _}, _} = err), do: err
 
 
   # Eliminate d from grid[s].
@@ -124,7 +126,7 @@ defmodule Sudoku do
     eliminate_from_squares(grid, @peers[s], d2)
   end
   defp check_peers(_, _,  []) do
-    :error # removed last value
+    {:error, "Removed last value"}
   end
   defp check_peers(grid, _, _) do
     {:ok, grid}
@@ -140,21 +142,22 @@ defmodule Sudoku do
     |> elem(0)
   end
 
-  defp check_unit(_, msg = {:error, _, _}), do: msg
+  defp check_unit(_, err = {{:error, _}, _, _}), do: err
   defp check_unit(u, msg = {{:ok, grid}, s, d}) do
     dplaces = for s <- u, d in grid[s], do: s
 
     case length(dplaces) do
-       0 -> # no place for this value
-         {:error, s, d}
+       0 -> {{:error, "No place found for inserting value"}, s, d}
        1 -> # d can only be in one place in unit; assign it there
          {assign(grid, List.first(dplaces), d), s, d}
        _ -> msg
     end
   end
 
+  ######################## Search ########################
 
   # Using depth-first search and propagation, try all possible values.
+  defp search({:error, _} = err), do: err
   defp search({:ok, grid}) do
     if Enum.all?(@squares, & length(grid[&1]) == 1) do
       {:ok, grid} # Solved!
@@ -167,15 +170,16 @@ defmodule Sudoku do
       loop_until_solution_found(values, fn d -> search(assign(grid, s, d)) end)
     end
   end
-  defp search(err), do: err
 
-  defp loop_until_solution_found([], _), do: :error
+  defp loop_until_solution_found([], _), do: {:error, "No solution found"}
   defp loop_until_solution_found([d|rest], searcher) do
     case searcher.(d) do
-      :error -> loop_until_solution_found(rest, searcher)
+      {:error, _} -> loop_until_solution_found(rest, searcher)
       {:ok, grid} -> {:ok, grid}
     end
   end
+
+  ######################## Display #######################
 
   def display(grid) do
     width =
@@ -203,6 +207,8 @@ defmodule Sudoku do
 
     :ok
   end
+
+  ######################### Solve ########################
 
   def solve(spec) do
     spec
