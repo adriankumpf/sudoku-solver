@@ -1,6 +1,6 @@
 defmodule Sudoku.Helper do
   @moduledoc """
-  A separate module of functions needed at compile time.
+  A separate module of functions, some of which are needed at compile time.
   """
 
   def cross(as, bs) do
@@ -16,6 +16,11 @@ defmodule Sudoku.Helper do
     s = List.duplicate(c, div(fill, 2))
     a = List.duplicate(c, rem(fill, 2))
     s ++ chars ++ s ++ a
+  end
+
+  def measure(func) do
+    {time, result} = :timer.tc(func)
+    {time/1_000_000, result}
   end
 end
 

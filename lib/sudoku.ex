@@ -216,4 +216,36 @@ defmodule Sudoku do
     |> assign_into(@initial_grid)
     |> search
   end
+
+  ###################### Benchmarking ####################
+
+  def from_file(path) do
+    path
+    |> File.read!
+    |> String.trim
+    |> String.split("\n")
+    |> Enum.map(&to_charlist/1)
+  end
+
+  def solve_all(specs, name \\ '') do
+    results = Enum.map(specs, & measure(fn -> solve(&1) end))
+    times   = Enum.map(results, & elem(&1, 0))
+    solved  = results |> Enum.filter(& &1 |> elem(1) |> solved?) |> length
+
+    len = length(results)
+    avg = Float.round(Enum.sum(times) / len, 2)
+    max = times |> Enum.max |> Float.round(2)
+
+    IO.puts "Solved #{solved} of #{len} #{name} puzzles (avg #{avg}s, max #{max}s)"
+  end
+
+  defp solved?({:error, _}), do: false
+  defp solved?({:ok, grid}) do
+    @units_list |> Enum.map(&unit_solved?(&1, grid)) |> Enum.all?
+  end
+
+  defp unit_solved?(unit, grid) do
+    (Enum.flat_map(unit, &grid[&1]) |> MapSet.new) == MapSet.new(@digits)
+  end
+
 end
