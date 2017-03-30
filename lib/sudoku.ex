@@ -156,6 +156,31 @@ defmodule Sudoku do
   defp search({:ok, grid}), do: grid
   defp search(err), do: err
 
+  def display(grid) do
+    width =
+      (for s <- @squares, do: length grid[s])
+      |> Enum.max
+      |> Kernel.+(1)
+
+    line =
+      '-'
+      |> List.duplicate(3 * width)
+      |> Enum.join("")
+      |> List.duplicate(3)
+      |> Enum.join("+")
+
+    for r <- @rows do
+      for c <- @cols do
+        grid[[r, c]]
+        |> center(width)
+        |> Kernel.++(if c in '36', do: '|', else: '')
+      end
+      |> IO.puts
+
+      if r in 'CF', do: IO.puts line
+    end
+  end
+
   # Sudoku.main '003020600900305001001806400008102900700000008006708200002609500800203009005010300'
 
   def main(spec) do
@@ -164,5 +189,4 @@ defmodule Sudoku do
     |> assign_into(@initial_grid)
     |> search
   end
-
 end
